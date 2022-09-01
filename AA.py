@@ -1,8 +1,6 @@
 import numpy as np
 np.seterr(divide = 'ignore') 
 
-length = 22
-
 table={}
 table['letter'] = ['X','A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y','*']
 table['name'] = ['???','Ala','Cys','Asp','Glu','Phe','Gly','His','Ile','Lys','Leu','Met','Asn','Pro','Gln','Arg','Ser','Thr','Val','Trp','Tyr','***']
@@ -24,9 +22,13 @@ for k,v in table.items():
 
 table['hydro2'] = (1.0/9.0)*table['hydro'] + 0.5
 table['lodpapa1'] = np.log(table['odpapa1'])
+table['lodpapa1'][0] = table['lodpapa1'][-1] = 0
 table['lodpapa2'] = np.log(table['odpapa2'])
+table['lodpapa2'][0] = table['lodpapa2'][-1] = 0
 
-index = dict(zip(table['letter'],range(len(table))))
+length = len(table['letter'])
+index = dict(zip(table['letter'],range(length)))
+
 def stringToIndices(string):
 	return np.array(list(map(lambda c:index.get(c,0),string.upper())))
 

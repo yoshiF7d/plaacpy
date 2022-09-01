@@ -27,7 +27,7 @@ def highestScoringSubsequence(seq,min=None,max=None):
 		if n%2==0:
 			rfrec[rn] = l%2
 		
-		conv = np.round(np.fft.irfft(rfseq*rfrec,n),15)
+		conv = np.fft.irfft(rfseq*rfrec,n)
 		if conv[l-1:].size > 0:
 			ind = np.argmax(conv[l-1:]) + l - 1
 		else:

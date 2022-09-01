@@ -4,7 +4,6 @@ import AA
 from HighestScoringSubsequence import highestScoringSubsequence
 from Colors import Colors
 
-
 class DisorderReport():
 	def __init__(self,aa,ww1,ww2,ww3,cc,plaacWeights,papaWeights):
 		self.ww1 = ww1
@@ -34,7 +33,6 @@ class DisorderReport():
 		self.plaacLLR = movingAverage(self.maa3,ww3)
 		self.maa4 = self.papaWeights[aa]
 		self.papa = movingAverage(self.maa4,ww2,mergeMe=13,seq=aa)
-		
 		self.papaX2 = movingAverage(self.papa,ww2,weight=True)
 		self.plaacLLRX2 = movingAverage(self.plaacLLR,ww3,weight=True)
 		self.fix2 = movingAverage(self.fi,ww1,weight=True)
@@ -51,19 +49,27 @@ class DisorderReport():
 			self.numDisorderedStrict += halfw + 1
 		if self.fi[self.length-halfw-1] < 0:
 			self.numDisorderedStrict += halfw + 1
-			
-		if self.papaX2[ww2-1//2:-(ww2-1//2)].size > 0:
-			self.papaMaxCenter = np.argmax(self.papaX2[ww2-1//2:-(ww2-1//2)])
+		
+		temp = self.papaX2[(ww2-1)//2:-(ww2-1)//2]
+
+		if temp.size > 0:
+			self.papaMaxCenter = np.argmax(temp[self.fix2[(ww2-1)//2:-(ww2-1)//2] < 0])
 		else:
 			self.papaMaxCenter = -1
-		self.papaMaxScore = self.papaX2[self.papaMaxCenter]
-		
+
+		print(Colors.YELLOW + str(temp) + Colors.RESET)
+		#print(Colors.CYAN + str(self.papa) + Colors.RESET)
+		#print(Colors.MAGENTA + str(self.aa) + Colors.RESET)
+		#print(Colors.RED + str(self.papaMaxCenter) + Colors.RESET)
+
+		self.papaMaxScore = self.papaX2[self.papaMaxCenter]		
 		self.papaMaxProb = self.papaX2[self.papaMaxCenter]
 		self.papaMaxDis = self.fix2[self.papaMaxCenter]
 		self.papaMaxLLR2 = self.plaacLLRX2[self.papaMaxCenter]
 		self.papaMaxLLR = self.plaacLLR[self.papaMaxCenter]
 		
 		self.hssr = highestScoringSubsequence(self.maa3)
+		
 		if(
 			self.hssr[1] - self.hssr[0] + 1 < self.minLength or
 			self.hssr[1] - self.hssr[0] + 1 > self.maxLength
@@ -193,7 +199,7 @@ def movingAverage(arr,ww,*,weight=False,mergeMe=None,seq=None):
 		mask = l*np.ones(n0)
 		mask[:w] = 1 + w + np.arange(w)
 		mask[-w:] = 1 + w + np.arange(w)[::-1]
-		
+	
 	if mergeMe is not None:
 		mask = np.ones(n0)
 		for i in range(n0):
@@ -202,7 +208,7 @@ def movingAverage(arr,ww,*,weight=False,mergeMe=None,seq=None):
 				(seq[i] == mergeMe and i >= 2 and seq[i-2] == mergeMe)
 			):
 				mask[i] = 0
-		
+	
 	if (mergeMe is not None) or weight:
 		rfa = np.fft.rfft(np.concatenate((mask*arr,np.zeros(pad))))
 	else:
