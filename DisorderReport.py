@@ -5,6 +5,7 @@ from HighestScoringSubsequence import highestScoringSubsequence
 from Colors import Colors
 
 class DisorderReport():
+	#@profile
 	def __init__(self,aa,ww1,ww2,ww3,cc,plaacWeights,papaWeights):
 		self.ww1 = ww1
 		self.ww2 = ww2
@@ -15,9 +16,11 @@ class DisorderReport():
 		self.papaWeights = papaWeights
 		self.length = len(aa)
 		
-		self.minLength = 80
-		self.maxLength = 240
-		self.minLength2 = 40
+		self.minLengthHSS = 80
+		self.maxLengthHSS = 240
+		self.minLengthFI = 5
+		self.maxLengthFI = 0
+		self.minLengthLocal = 40
 		
 		maa1 = AA.table['hydro2'][aa]
 		self.meanHydro = np.mean(maa1)
@@ -37,48 +40,68 @@ class DisorderReport():
 		self.plaacLLRX2 = movingAverage(self.plaacLLR,ww3,weight=True)
 		self.fix2 = movingAverage(self.fi,ww1,weight=True)
 		
-		self.numDisordered = np.sum(self.fi[self.fi<0])
+		self.numDisordered = np.count_nonzero(self.fi<0)
 		
 		halfw = (ww1-1)//2
 		if halfw > self.length//2:
 			halfw = self.length//2
 			
-		self.numDisorderedStrict = self.fi[self.fi<0][halfw+1:-(halfw+1)]
+		self.numDisorderedStrict = np.count_nonzero(self.fi[halfw+1:-(halfw+1)]<0)
 			
 		if self.fi[halfw] < 0:
-			self.numDisorderedStrict += halfw + 1
+			self.numDisorderedStrict = halfw + 1
 		if self.fi[self.length-halfw-1] < 0:
-			self.numDisorderedStrict += halfw + 1
+			self.numDisorderedStrict = halfw + 1
+				
+		#for k in range(ww2-1//2,self.length-(ww2-1)//2):
+		#	if self.papaX2[k] > self.papaMaxScore and self.fix2[k] < 0:
+		#		self.papaMaxCenter = k
+		#		self.papaMaxScore = self.papaX2[k]
 		
-		temp = self.papaX2[(ww2-1)//2:-(ww2-1)//2]
-
-		if temp.size > 0:
-			self.papaMaxCenter = np.argmax(temp[self.fix2[(ww2-1)//2:-(ww2-1)//2] < 0])
+		ind = np.where(self.fix2[(ww2-1)//2:-(ww2-1)//2] < 0)[0]
+		if ind.size > 0:
+			self.papaMaxCenter = (ww2-1)//2 + ind[self.papaX2[(ww2-1)//2:-(ww2-1)//2][ind].argmax()]
+			self.papaMaxScore = self.papaX2[self.papaMaxCenter]
 		else:
 			self.papaMaxCenter = -1
+			self.papaMaxScore = -np.inf
 
-		print(Colors.YELLOW + str(temp) + Colors.RESET)
+		#ind = np.where(self.fix2[(ww2-1)//2:-(ww2-1)//2] < 0)[0]
+		#print(self.fix2[(ww2-1)//2:-(ww2-1)//2])
+
+		#if temp.size > 0:
+		#	self.papaMaxCenter = np.argmax(temp[self.fix2[(ww2-1)//2:-(ww2-1)//2] < 0]) + (ww2-1)//2
+		#else:
+		#	self.papaMaxCenter = -1
+
+		#print(Colors.YELLOW + str(temp) + Colors.RESET)
 		#print(Colors.CYAN + str(self.papa) + Colors.RESET)
 		#print(Colors.MAGENTA + str(self.aa) + Colors.RESET)
 		#print(Colors.RED + str(self.papaMaxCenter) + Colors.RESET)
-
-		self.papaMaxScore = self.papaX2[self.papaMaxCenter]		
-		self.papaMaxProb = self.papaX2[self.papaMaxCenter]
-		self.papaMaxDis = self.fix2[self.papaMaxCenter]
-		self.papaMaxLLR2 = self.plaacLLRX2[self.papaMaxCenter]
-		self.papaMaxLLR = self.plaacLLR[self.papaMaxCenter]
+		if (self.papaMaxCenter >= 0):
+			self.papaMaxScore = self.papaX2[self.papaMaxCenter]		
+			self.papaMaxProb = self.papaX2[self.papaMaxCenter]
+			self.papaMaxDis = self.fix2[self.papaMaxCenter]
+			self.papaMaxLLR2 = self.plaacLLRX2[self.papaMaxCenter]
+			self.papaMaxLLR = self.plaacLLR[self.papaMaxCenter]
+		else:
+			self.papaMaxScore = np.nan
+			self.papaMaxProb = np.nan
+			self.papaMaxDis = np.nan
+			self.papaMaxLLR2 = np.nan
+			self.papaMaxLLR = np.nan
 		
 		self.hssr = highestScoringSubsequence(self.maa3)
 		
 		if(
-			self.hssr[1] - self.hssr[0] + 1 < self.minLength or
-			self.hssr[1] - self.hssr[0] + 1 > self.maxLength
+			self.hssr[1] - self.hssr[0] + 1 < self.minLengthHSS or
+			self.hssr[1] - self.hssr[0] + 1 > self.maxLengthHSS
 		):
-			self.hssr2 = highestScoringSubsequence(self.maa3,self.minLength,self.maxLength)
+			self.hssr2 = highestScoringSubsequence(self.maa3,self.minLengthHSS,self.maxLengthHSS)
 		else:
 			self.hssr2 = self.hssr
 				
-		n = self.length//self.minLength
+		n = self.length//self.minLengthFI
 		
 		self.startAA = np.zeros(n)
 		self.stopAA = np.zeros(n)
@@ -119,7 +142,7 @@ class DisorderReport():
 					stopIndex = self.length - 1
 				segLength = stopIndex - startIndex + 1
 				
-				if segLength >= self.minLength:
+				if segLength >= self.minLengthFI:
 					self.startAA[self.numSegment] = startIndex
 					self.stopAA[self.numSegment] = stopIndex
 					self.lengthAA[self.numSegment] = segLength
@@ -132,12 +155,12 @@ class DisorderReport():
 			else:
 				i+=1
 		if len(self.lengthAA) > 0:
-			self.maxLength = int(np.max(self.lengthAA))
+			self.maxLengthFI = int(np.max(self.lengthAA))
 
-		temp = self.localMean[self.lengthAA >= self.minLength2]
+		temp = self.localMean[self.lengthAA >= self.minLengthLocal]
 		if temp.size > 0:
-			self.bestIndex = np.argmax(self.localMean[self.lengthAA >= self.minLength2])
-			self.maxLong = self.localMean[self.bestIndex]
+			self.bestIndex = np.argmax(self.localMean[self.lengthAA >= self.minLengthLocal])
+			self.maxLong = self.localMean[self.lengthAA >= self.minLengthLocal][self.bestIndex]
 		else:
 			self.bestIndex = 0
 			self.maxLong = 0
@@ -222,12 +245,15 @@ def movingAverage(arr,ww,*,weight=False,mergeMe=None,seq=None):
 		rfr = np.concatenate(([l],ff(np.arange(1,rn))))
 	
 	conv = np.fft.irfft(rfa*rfr,n)
-	denom = l*np.ones(n)
-	denom[:l] = 1 + np.arange(l)
-	denom[-l:] = 1 + np.arange(l)[::-1]
 	
 	if weight:
-		return (conv/denom)[w:-w]/mask
+		denom = l*l*np.ones(n)
+		denom[:l+w] = l*l - 0.5 * np.arange(l+w)[::-1] * (np.arange(l+w)[::-1] + 1)
+		denom[-l-w:] = l*l - 0.5 * np.arange(l+w) * (np.arange(l+w) + 1)
 	else:
-		return (conv/denom)[w:-w]
+		denom = l*np.ones(n)
+		denom[:l] = 1 + np.arange(l)
+		denom[-l:] = 1 + np.arange(l)[::-1]
+	
+	return (conv/denom)[w:-w]
 		

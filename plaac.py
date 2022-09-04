@@ -52,6 +52,21 @@ def computeAAFreq(file):
 	
 	return res
 
+def longestOnes(seq):
+	maxl = 0
+	i = 0
+	while i < len(seq):
+		if seq[i] > 0:
+			si = i
+			while i < len(seq) and seq[i] > 0:
+				i += 1
+			if i - si >= maxl:
+				maxl = i - si
+		else:
+			i += 1
+	return maxl
+
+#@profile
 def scoreAllFastas(file,coreLength,ww1,ww2,ww3,fg,bg,llr,hmm1,hmm0):
 	print(
 		"SEQid\tMW\tMWstart\tMWend\tMWlen\tLLR\tLLRstart\tLLRend\t"\
@@ -89,7 +104,8 @@ def scoreAllFastas(file,coreLength,ww1,ww2,ww3,fg,bg,llr,hmm1,hmm0):
 		
 		dr = DisorderReport(aa,ww1,ww2,ww3,np.array([2.785,-1,-1.151]),llr,AA.table['lodpapa1'])
 		mp = hmm1.viterbiPath
-		longestPrd = int(highestScoringSubsequence(mp)[2])
+		#longestPrd = int(highestScoringSubsequence(mp)[2])
+		longestPrd = longestOnes(mp)
 		maa3 = llr[aa]
 		big_neg = -1e+6
 		maa3[mp==0] = big_neg
@@ -146,7 +162,7 @@ def scoreAllFastas(file,coreLength,ww1,ww2,ww3,fg,bg,llr,hmm1,hmm0):
 		if aaStop - aaStart + 1 >= coreLength:
 			str2 = (
 				AA.indicesToString(aa[coreStart:coreStop+1]) + '\t' +
-				AA.indicesToString(aa[aaStart:aaStop+14]) + '\t' +
+				AA.indicesToString(aa[aaStart:aaStart+14]) + '\t' +
 				AA.indicesToString(aa[aaStop-14:aaStop]) + '\t' +
 				AA.indicesToString(prd)
 			)
@@ -164,7 +180,7 @@ def scoreAllFastas(file,coreLength,ww1,ww2,ww3,fg,bg,llr,hmm1,hmm0):
 		str3 = fmtstr.format(
 			dr.numDisorderedStrict2,
 			dr.meanHydro,dr.meanCharge,dr.meanFI,
-			dr.maxLength,
+			dr.maxLengthFI,
 			dr.papaMaxScore,dr.papaMaxProb,dr.papaMaxDis,dr.papaMaxLLR,dr.papaMaxLLR2,
 			dr.papaMaxCenter + 1,
 			AA.indicesToString(aa[dr.papaMaxCenter-ww2//2:dr.papaMaxCenter+ww2//2+1])
@@ -280,4 +296,3 @@ ww3 = 41
 
 if (args.inputFile is not None) and (args.plotList is None):
 	scoreAllFastas(args.inputFile,args.coreLength,args.ww1,args.ww2,ww3,fg,bg,llr,hmm1,hmm0)
-	

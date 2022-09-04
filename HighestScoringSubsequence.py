@@ -1,4 +1,5 @@
 import numpy as np
+#@profile
 def highestScoringSubsequence(seq,min=None,max=None):
 	if min is None:
 		min = 1

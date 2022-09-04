@@ -21,9 +21,9 @@ class HiddenMarkovModel():
 		self.leprob = np.log(self.eprob)
 		self.liprob = np.log(self.iprob)
 		
-		print(Colors.YELLOW + str(self.ltprob))
-		print(Colors.CYAN + str(self.leprob))
-		print(Colors.BLUE + str(self.liprob) + Colors.RESET)
+		#print(Colors.YELLOW + str(self.ltprob))
+		#print(Colors.CYAN + str(self.leprob))
+		#print(Colors.BLUE + str(self.liprob) + Colors.RESET)
 				
 		self.rs = np.sum(self.tprob,axis=1)
 		self.ns = len(self.iprob)
@@ -65,7 +65,7 @@ class HiddenMarkovModel():
 	def setnames(self,names):
 		self.names = names
 		self.uNames = names
-	
+	#@profile
 	def decodeAll(self,seq):
 		self.viterbiDecodeL(seq)
 		self.mapDecodeL(seq)
@@ -81,6 +81,7 @@ class HiddenMarkovModel():
 		
 		self.lpst = self.logProbSubTrellis(seq)
 	
+	#@profile
 	def viterbiDecodeL(self,seq):
 		n = len(seq)
 		vit = np.zeros(n,dtype='i8')
@@ -116,6 +117,7 @@ class HiddenMarkovModel():
 		self.viterbiPath = vit
 		return vit
 	
+	#@profile
 	def mapDecodeL(self,seq):
 		map = np.zeros(len(seq),dtype='i8')
 		pp = self.posteriorL(seq)
@@ -126,30 +128,20 @@ class HiddenMarkovModel():
 		self.postPorb = pp
 		self.mapPath = map
 		return map
-		
+	
+	#@profile
 	def posteriorL(self,seq):
 		n = len(seq)
 		a = np.zeros((self.ns,n))
 		pp = np.zeros((self.ns,n))
 		a[:,0] = self.liprob +self.leprob[:,seq[0]]
-		#print(Colors.CYAN + str(a) + Colors.RESET)
+
 		for t in range(1,n):
 			for i in range(self.ns):
 				a[i,t] = reduce(logeapeb,self.ltprob[:,i] + a[:,t-1]) + self.leprob[i,seq[t]]
-				#a[i,t] = np.log(np.sum(np.exp(self.ltprob[:,i] + a[:,t-1]))) + self.leprob[i,seq[t]]
-				#print(np.exp(self.ltprob[:,i] + a[:,t-1]))
-		
-		#print(Colors.RED + str(a) + Colors.RESET)
 		
 		self.ltotProb = reduce(logeapeb,self.lfprob + a[:,n-1])
-		#self.ltotProb = np.log(np.sum(np.exp(self.lfprob + a[:,n-1])))
 		self.lmarginalProb = self.ltotProb
-		#print(Colors.DARKRED + str(self.leprob) + Colors.RESET)
-		#print(Colors.YELLOW + str(self.liprob) + Colors.RESET)
-		#print(Colors.CYAN + str(self.lfprob) + Colors.RESET)
-		#print(Colors.BLUE + str(self.lTotProb) + Colors.RESET)
-		#print(Colors.CYAN + str(np.exp(self.lfprob + a[:,n-1])) + Colors.RESET)
-		#print(Colors.BLUE + str(self.lfprob + a[:,n-1]) + Colors.RESET)
 		
 		b = np.ndarray((self.ns,n),dtype='f8')
 		b[:,n-1] = self.lfprob
@@ -157,58 +149,9 @@ class HiddenMarkovModel():
 		for t in reversed(range(n-1)):
 			for i in range(self.ns):
 				b[i,t] = reduce(logeapeb,self.ltprob[i,:] + b[:,t+1] + self.leprob[:,seq[t+1]]) 
-				#b[i,t] = np.log(np.sum(np.exp(self.ltprob[i,:] + b[:,t+1] + self.leprob[:,seq[t+1]])))
 		
 		lpseq = reduce(logeapeb,a[:][0] + b[:][0])
-		#print(Colors.MAGENTA + str(self.lfprob + a[:,n-1]) + Colors.RESET)
 		pp = np.exp(a+b-lpseq)
-		#print(Colors.GRAY + str(a) + Colors.RESET)
-		#print(Colors.DARKCYAN + str(b) + Colors.RESET)
-		#print(Colors.YELLOW + str(lpseq) + Colors.RESET)
-		
-		if(self.numClasses<self.ns):
-			pp = collapsePosteriors(pp,self.classes,self.numClasses)
-		
-		self.postProb = pp
-		return pp
-		
-	def posterior(self,seq):
-		n = len(seq)
-		a = np.zeros((self.ns,n))
-		pp = np.zeros((self.ns,n))
-		a[:,0] = self.iprob * self.eprob[:,seq[0]]
-
-		#print(Colors.GREEN + str(self.iprob) + Colors.RESET)
-		#print(Colors.DARKGREEN + str(np.sum(self.eprob)) + Colors.RESET)
-		#print(Colors.CYAN + str(a[:,0]) + Colors.RESET)
-		
-		for t in range(1,n):
-			for i in range(self.ns):
-				a[i,t] = np.sum(self.tprob[:,i]*a[:,t-1]) * self.eprob[i,seq[t]]
-		#print(Colors.RED + str(a) + Colors.RESET)
-		
-		self.ltotProb = np.log(np.sum(self.fprob*a[:,n-1]))
-		self.lmarginalProb = self.ltotProb
-		#print(Colors.DARKRED + str(self.leprob) + Colors.RESET)
-		#print(Colors.YELLOW + str(self.lMarginalProb) + Colors.RESET)
-		#print(Colors.CYAN + str(self.fprob) + Colors.RESET)
-		#print(Colors.BLUE + str(np.sum(self.fprob*a[:,n-1])) + Colors.RESET)
-		#print(Colors.CYAN + str(np.exp(self.lfprob + a[:,n-1])) + Colors.RESET)
-		#print(Colors.BLUE + str(self.lfprob + a[:,n-1]) + Colors.RESET)
-		
-		b = np.ndarray((self.ns,n),dtype='f8')
-		b[:,n-1] = self.fprob
-		
-		for t in reversed(range(n-1)):
-			for i in range(self.ns):
-				b[i,t] = np.sum(self.tprob[i,:]*b[:,t+1]*self.eprob[:,seq[t+1]])
-		
-		pseq = np.sum(a[:][0] * b[:][0])
-		#print(Colors.MAGENTA + str(self.lfprob + a[:,n-1]) + Colors.RESET)
-		pp = a*b/pseq
-		print(Colors.GRAY + str(pseq) + Colors.RESET)
-		#print(Colors.DARKCYAN + str(b) + Colors.RESET)
-		#print(Colors.YELLOW + str(lpseq) + Colors.RESET)
 		
 		if(self.numClasses<self.ns):
 			pp = collapsePosteriors(pp,self.classes,self.numClasses)
@@ -226,6 +169,7 @@ class HiddenMarkovModel():
 	def logProbSubTrellis(self,seq):	
 		return self.logProbTrellis(seq,self.subTrellis) - self.logProbTrellis(seq,np.ones(self.ns))
 	
+	#@profile
 	def logProbTrellis(self,seq,st):
 		n = len(seq)
 		sc = np.ones(n)
