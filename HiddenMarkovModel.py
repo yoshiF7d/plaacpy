@@ -7,6 +7,10 @@ from Colors import Colors
 from functools import reduce
 np.seterr(divide = 'ignore') 
 
+#import pyximport
+#pyximport.install(setup_args={"include_dirs":np.get_include()})
+#from logProbTrellis import logProbTrellis
+
 class HiddenMarkovModel():
 	def	__init__(self,tprob,eprob,iprob):
 		self.tprob = tprob
@@ -20,11 +24,7 @@ class HiddenMarkovModel():
 		self.ltprob = np.log(self.tprob)
 		self.leprob = np.log(self.eprob)
 		self.liprob = np.log(self.iprob)
-		
-		#print(Colors.YELLOW + str(self.ltprob))
-		#print(Colors.CYAN + str(self.leprob))
-		#print(Colors.BLUE + str(self.liprob) + Colors.RESET)
-				
+						
 		self.rs = np.sum(self.tprob,axis=1)
 		self.ns = len(self.iprob)
 		self.fprob = np.zeros(self.ns)
@@ -65,10 +65,13 @@ class HiddenMarkovModel():
 	def setnames(self,names):
 		self.names = names
 		self.uNames = names
+
+	#SLOW 2
 	#@profile
 	def decodeAll(self,seq):
-		self.viterbiDecodeL(seq)
-		self.mapDecodeL(seq)
+		#self.viterbiDecodeL(seq)
+		#self.mapDecodeL(seq)
+		self.decode(seq)
 		self.margCollapse = np.zeros(len(seq))
 		self.etst = 0.0
 		
@@ -80,7 +83,61 @@ class HiddenMarkovModel():
 			self.etst = np.sum(self.postProb[0])
 		
 		self.lpst = self.logProbSubTrellis(seq)
+		#self.lpst = self.logProbSubTrellisFast(seq)
 	
+	# vitabiDecodeL and mapDecodeL are combined in one and it becomes slow why
+	#@profile
+	def decode(self,seq):
+		n = len(seq)
+		vit = np.zeros(n,dtype='i8')
+		tb = np.zeros((self.ns,n),dtype='i8')
+		
+		s = np.zeros((self.ns,n),dtype='float64')
+		a = np.zeros((self.ns,n),dtype='float64')
+		b = np.zeros((self.ns,n),dtype='float64')
+		pp = np.zeros((self.ns,n),dtype='float64')
+		
+		a[:,0] = self.liprob + self.leprob[:,seq[0]]
+		s[:,0] = a[:,0]
+		
+		for t in range(1,n):
+			for i in range(self.ns):
+				tb[i,t] = bestIndex = np.argmax(self.ltprob[:,i] + s[:,t-1])
+				bestScore = self.ltprob[bestIndex,i] + s[bestIndex,t-1]
+				s[i,t] = bestScore + self.leprob[i,seq[t]]
+				a[i,t] = reduce(logeapeb,self.ltprob[:,i] + a[:,t-1]) + self.leprob[i,seq[t]]
+		
+		self.ltotProb = reduce(logeapeb,self.lfprob + a[:,n-1])
+		self.lmarginalProb = self.ltotProb
+		b[:,n-1] = self.lfprob
+		
+		bestIndex = np.argmax(s[:,n-1] + self.lfprob)
+		bestScore = s[bestIndex,n-1] + self.lfprob[bestIndex]
+		vit[n-1] = bestIndex
+		
+		for t in reversed(range(n-1)):
+			vit[t] = tb[vit[t+1],t+1]
+			for i in range(self.ns):
+				b[i,t] = reduce(logeapeb,self.ltprob[i,:] + b[:,t+1] + self.leprob[:,seq[t+1]]) 
+		
+		lpseq = reduce(logeapeb,a[:][0] + b[:][0])
+		pp = np.exp(a+b-lpseq)
+		
+		self.lviterbiProb = bestScore
+		if self.numClasses < self.ns:
+			vit = self.classes[vit]
+			pp = collapsePosteriors(pp,self.classes,self.numClasses)
+		self.viterbiPath = vit
+		self.postProb = pp
+		
+		map = np.zeros(len(seq),dtype='i8')
+		for i in range(n):
+			for j in range(self.ns):
+				if pp[j,i] > pp[map[i]][i]:
+					map[i] = j
+		
+		self.mapPath = map
+		
 	#@profile
 	def viterbiDecodeL(self,seq):
 		n = len(seq)
@@ -96,19 +153,13 @@ class HiddenMarkovModel():
 				bestScore = self.ltprob[bestIndex,i] + s[bestIndex,t-1]
 				s[i,t] = bestScore + self.leprob[i,seq[t]]
 				tb[i,t] = bestIndex
-		
-		#print(Colors.YELLOW + str(self.ltprob[:,0] + s[:,0]) + Colors.RESET)
-		#print(Colors.GRAY + str(s) + Colors.RESET)
-		#print(Colors.MARINE + str(tb) + Colors.RESET)
-		
+				
 		bestIndex = np.argmax(s[:,n-1] + self.lfprob)
 		bestScore = s[bestIndex,n-1] + self.lfprob[bestIndex]
 		
 		vit[n-1] = bestIndex
 		for t in reversed(range(n-1)):
 			vit[t] = tb[vit[t+1],t+1]
-
-		#print(Colors.DARKGREEN + str(vit) + Colors.RESET)
 
 		self.lviterbiProb = bestScore
 		if self.numClasses < self.ns:
@@ -123,9 +174,9 @@ class HiddenMarkovModel():
 		pp = self.posteriorL(seq)
 		for i in range(len(seq)):
 			for j in range(len(pp)):
-				if pp[j][i] > pp[map[i]][i]:
+				if pp[j,i] > pp[map[i]][i]:
 					map[i] = j
-		self.postPorb = pp
+		#self.postProb = pp
 		self.mapPath = map
 		return map
 	
@@ -134,13 +185,15 @@ class HiddenMarkovModel():
 		n = len(seq)
 		a = np.zeros((self.ns,n))
 		pp = np.zeros((self.ns,n))
-		a[:,0] = self.liprob +self.leprob[:,seq[0]]
+		a[:,0] = self.liprob + self.leprob[:,seq[0]]
 
 		for t in range(1,n):
 			for i in range(self.ns):
 				a[i,t] = reduce(logeapeb,self.ltprob[:,i] + a[:,t-1]) + self.leprob[i,seq[t]]
+				#a[i,t] = logExpSum(self.ltprob[:,i] + a[:,t-1]) + self.leprob[i,seq[t]]
 		
 		self.ltotProb = reduce(logeapeb,self.lfprob + a[:,n-1])
+		#self.ltotProb = logExpSum(self.lfprob + a[:,n-1])
 		self.lmarginalProb = self.ltotProb
 		
 		b = np.ndarray((self.ns,n),dtype='f8')
@@ -149,11 +202,13 @@ class HiddenMarkovModel():
 		for t in reversed(range(n-1)):
 			for i in range(self.ns):
 				b[i,t] = reduce(logeapeb,self.ltprob[i,:] + b[:,t+1] + self.leprob[:,seq[t+1]]) 
-		
+				#b[i,t] = logExpSum(self.ltprob[i,:] + b[:,t+1] + self.leprob[:,seq[t+1]]) 
+
 		lpseq = reduce(logeapeb,a[:][0] + b[:][0])
+		#lpseq = logExpSum(a[:][0] + b[:][0])
 		pp = np.exp(a+b-lpseq)
 		
-		if(self.numClasses<self.ns):
+		if self.numClasses<self.ns:
 			pp = collapsePosteriors(pp,self.classes,self.numClasses)
 		
 		self.postProb = pp
@@ -165,9 +220,27 @@ class HiddenMarkovModel():
 			npp[mask,j] += pp[:,j]
 		
 		return npp
-		
-	def logProbSubTrellis(self,seq):	
+	
+	def logProbSubTrellis(self,seq):
 		return self.logProbTrellis(seq,self.subTrellis) - self.logProbTrellis(seq,np.ones(self.ns))
+	
+	def logProbSubTrellisFast(self,seq):
+		a = logProbTrellis(
+			seq,
+			self.subTrellis,
+			len(seq),
+			self.ns,
+			self.iprob,self.tprob,self.eprob
+		)
+		b = logProbTrellis(
+			seq,
+			np.ones(self.ns,dtype=np.int),
+			len(seq),
+			self.ns,
+			self.iprob,self.tprob,self.eprob
+		)
+		return a - b
+		#return self.logProbTrellis(seq,self.subTrellis) - self.logProbTrellis(seq,np.ones(self.ns))
 	
 	#@profile
 	def logProbTrellis(self,seq,st):
@@ -176,13 +249,14 @@ class HiddenMarkovModel():
 		a = np.zeros((self.ns,n))
 		
 		for i in range(self.ns):
-			if st[i] == 1: a[i,0] =  self.iprob[i]*self.eprob[i,seq[0]]	
+			if st[i] == 1:
+				a[i,0] =  self.iprob[i]*self.eprob[i,seq[0]]
 		
 		for t in range(1,n):
 			sf = 0
 			for i in range(self.ns):
 				if st[i]==1:
-					a[i,t] = np.sum(self.tprob[:,i]*a[:,t-1])*self.eprob[i][seq[t]]
+					a[i,t] = np.sum(self.tprob[:,i]*a[:,t-1])*self.eprob[i,seq[t]]
 					sf += a[i,t]
 			sc[t] = 1/sf
 			a[:,t] = a[:,t]*sc[t]
@@ -196,8 +270,8 @@ def normalize(array):
 	return array/sum
 
 def prionHMM0(bgFreq):
-	tmat = np.array([[1,0],[0,1]])
-	imat = np.array([1,0])
+	tmat = np.array([[1.,0.],[0.,1.]])
+	imat = np.array([1.,0.])
 	bg = normalize(bgFreq)
 	emat = np.array([bg,bg])
 	
@@ -227,3 +301,11 @@ def logeapeb(a,b):
 		return b + np.log(1+np.exp(a-b))
 	else:
 		return a + np.log(2)
+		
+def logExpSum(a):
+	t = a[a!=-np.inf]
+	#print(Colors.RED + str(t) + Colors.RESET)
+	if len(t)>0:
+		return np.log(np.sum(np.exp(t)))
+	
+	return -np.inf

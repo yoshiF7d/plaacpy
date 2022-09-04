@@ -91,6 +91,7 @@ class DisorderReport():
 			self.papaMaxLLR2 = np.nan
 			self.papaMaxLLR = np.nan
 		
+		#SLOW 1
 		self.hssr = highestScoringSubsequence(self.maa3)
 		
 		if(
