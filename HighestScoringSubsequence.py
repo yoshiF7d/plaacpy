@@ -20,11 +20,12 @@ def highestScoringSubsequence(seq,min=None,max=None):
 		rn = (n+1)//2
 		rfrec = np.ndarray(rn,dtype='c16')
 		
-	for l in range(min,max+1):
-		ff = lambda k: np.exp(-1.j*np.pi*(l-1)*k/n) * np.sin(np.pi*l*k/n) / np.sin(np.pi*k/n) 
+	ff = lambda l,k: np.exp(-1.j*np.pi*(l-1)*k/n) * np.sin(np.pi*l*k/n) / np.sin(np.pi*k/n) 
 
+	for l in range(min,max+1):
+		
 		rfrec[0] = l
-		rfrec[1:rn] = ff(np.arange(1,rn))
+		rfrec[1:rn] = ff(l,np.arange(1,rn))
 		if n%2==0:
 			rfrec[rn] = l%2
 		

@@ -171,7 +171,7 @@ class HiddenMarkovModel():
 	#@profile
 	def mapDecodeL(self,seq):
 		map = np.zeros(len(seq),dtype='i8')
-		pp = self.posteriorL(seq)
+		pp = self.posterior(seq)
 		for i in range(len(seq)):
 			for j in range(len(pp)):
 				if pp[j,i] > pp[map[i]][i]:
@@ -207,6 +207,43 @@ class HiddenMarkovModel():
 		lpseq = reduce(logeapeb,a[:][0] + b[:][0])
 		#lpseq = logExpSum(a[:][0] + b[:][0])
 		pp = np.exp(a+b-lpseq)
+		
+		if self.numClasses<self.ns:
+			pp = collapsePosteriors(pp,self.classes,self.numClasses)
+		
+		self.postProb = pp
+		return pp
+	
+	#@profile
+	def posterior(self,seq):
+		n = len(seq)
+		a = np.zeros((self.ns,n))
+		b = np.zeros((self.ns,n))
+		pp = np.zeros((self.ns,n))
+		dett = np.linalg.det(self.tprob)
+		deta = np.ones(n)
+		detb = np.ones(n)
+
+		a[:,0] = self.iprob
+
+		for t in range(1,n):
+			te = self.tprob * self.eprob[:,seq[t-1]]
+			deta[t] = np.sqrt(dett * np.prod(self.eprob[:,seq[t-1]]))
+			#print(deta[t]) 
+			a[:,t] = np.dot(te,a[:,t-1]) / deta[t]
+		
+		self.ltotProb = np.log(np.sum(a[:,n-1] * self.eprob[:,seq[n-1]] * self.fprob)) + np.sum(np.log(deta))
+		self.lmarginalProb = self.ltotProb
+		
+		b[:,n-1] = self.fprob
+		
+		for t in reversed(range(n-1)):
+			te = self.tprob.transpose() * self.eprob[:,seq[t+1]]
+			detb[t] = np.sqrt(dett * np.prod(self.eprob[:,seq[t+1]]))
+			b[:,t] = np.dot(te,b[:,t+1]) / detb[t]
+		
+		lpseq = np.log(np.sum(a[:,0]*b[:,0]*self.eprob[:,0]))
+		pp = a*b*self.eprob[:,seq]/lpseq
 		
 		if self.numClasses<self.ns:
 			pp = collapsePosteriors(pp,self.classes,self.numClasses)

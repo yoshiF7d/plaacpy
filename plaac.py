@@ -10,6 +10,12 @@ from DisorderReport import DisorderReport
 from HighestScoringSubsequence import highestScoringSubsequence
 import time
 
+import matplotlib.pyplot as plt
+import matplotlib.colors
+
+import os
+os.system('')
+
 def normalize(array):
 	sum = array.sum()
 	if sum == 0:
@@ -67,6 +73,7 @@ def longestOnes(seq):
 	return maxl
 
 #@profile
+
 def scoreAllFastas(file,coreLength,ww1,ww2,ww3,fg,bg,llr,hmm1,hmm0):
 	print(
 		"SEQid\tMW\tMWstart\tMWend\tMWlen\tLLR\tLLRstart\tLLRend\t"\
@@ -77,7 +84,28 @@ def scoreAllFastas(file,coreLength,ww1,ww2,ww3,fg,bg,llr,hmm1,hmm0):
 	print()
 	
 	fasta = readFasta(file)
+	fastalen = len(fasta)
+	seqlenmax = 0
 	for fs in fasta:
+		if len(fs[1]) > seqlenmax:
+			seqlenmax = len(fs[1])
+	fig,ax = plt.subplots(nrows=fastalen,sharex=True,figsize=(12,3))
+	
+	sm = plt.cm.ScalarMappable(
+		cmap = plt.get_cmap('jet',len(AA.ctable)),
+		norm = matplotlib.colors.BoundaryNorm(np.arange(len(AA.ctable)+1)-0.5,len(AA.ctable))
+	)
+	sm.set_array([])
+	cb = fig.colorbar(sm,ax=ax,
+			ticks=np.arange(len(AA.ctable)),
+			location='top',
+			shrink=0.8,
+			orientation='horizontal'
+		)
+	
+	cb.set_ticklabels(AA.ctable)
+	
+	for i,fs in enumerate(fasta):
 		name = fs[0]
 		seq = fs[1]
 		if seq[-1] == '*':
@@ -186,6 +214,15 @@ def scoreAllFastas(file,coreLength,ww1,ww2,ww3,fg,bg,llr,hmm1,hmm0):
 			AA.indicesToString(aa[dr.papaMaxCenter-ww2//2:dr.papaMaxCenter+ww2//2+1])
 		)
 		print(str1+str2+str3)
+		
+		#ax[i].imshow(AA.stringToColorIndices(seq)[np.newaxis,:],cmap='jet',aspect=20)
+		#ax[i].axes.get_xaxis().set_ticks([])
+		#ax[i].axes.get_yaxis().set_ticks([])
+		#ax[i].yaxis.set_label_coords(-0.05,0)
+		#ax[i].set_xlim([0,seqlenmax])
+		#ax[i].set_ylabel(name,rotation=0)
+	
+	#plt.show()
 
 parser = argparse.ArgumentParser(description='plaac')
 parser.add_argument('-i','--inputFile')

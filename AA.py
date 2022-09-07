@@ -41,3 +41,14 @@ def isValidProtein(aa):
 	if aa[-1] == 0:
 		return False
 	return True
+	
+ctable = np.array(['N','Q','Y','G','M','S','P','A','H','T','F','R','V','I','D','L','K','C','W','E'])
+cdict = dict(zip(ctable,range(len(ctable))))
+
+def aaToColorIndex(aa):
+	return np.array(list(map(lambda c:cdict[c],table['letter'][aa])))
+
+def stringToColorIndices(string):
+	arr = np.array(list(map(cdict.get,string.upper())))
+	#print(len(arr))
+	return arr
