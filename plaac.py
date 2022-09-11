@@ -12,6 +12,8 @@ import time
 
 import matplotlib.pyplot as plt
 import matplotlib.colors
+from matplotlib.collections import LineCollection
+from matplotlib.colors import ListedColormap, BoundaryNorm
 
 import os
 os.system('')
@@ -74,7 +76,7 @@ def longestOnes(seq):
 
 #@profile
 
-def scoreAllFastas(file,coreLength,ww1,ww2,ww3,fg,bg,llr,hmm1,hmm0):
+def scoreAllFastas(file,coreLength,ww1,ww2,ww3,fg,bg,llr,hmm1,hmm0,plotDir=None):
 	print(
 		"SEQid\tMW\tMWstart\tMWend\tMWlen\tLLR\tLLRstart\tLLRend\t"\
 		"LLRlen\tNLLR\tVITmaxrun\tCOREscore\tCOREstart\tCOREend\tCORElen\tPRDscore\tPRDstart\tPRDend\tPRDlen\tPROTlen\t"\
@@ -84,6 +86,9 @@ def scoreAllFastas(file,coreLength,ww1,ww2,ww3,fg,bg,llr,hmm1,hmm0):
 	print()
 	
 	fasta = readFasta(file)
+	
+	### preparation for plot
+	
 	fastalen = len(fasta)
 	seqlenmax = 0
 	for fs in fasta:
@@ -104,6 +109,8 @@ def scoreAllFastas(file,coreLength,ww1,ww2,ww3,fg,bg,llr,hmm1,hmm0):
 		)
 	
 	cb.set_ticklabels(AA.ctable)
+
+	###
 	
 	for i,fs in enumerate(fasta):
 		name = fs[0]
@@ -114,7 +121,7 @@ def scoreAllFastas(file,coreLength,ww1,ww2,ww3,fg,bg,llr,hmm1,hmm0):
 		aa = AA.stringToIndices(seq)
 
 		if len(aa) < 1:
-			continue		
+			continue
 		maa1 = AA.table["mask"][aa]
 		mwsize = 80
 		if len(maa1) < 80:
@@ -215,14 +222,48 @@ def scoreAllFastas(file,coreLength,ww1,ww2,ww3,fg,bg,llr,hmm1,hmm0):
 		)
 		print(str1+str2+str3)
 		
-		#ax[i].imshow(AA.stringToColorIndices(seq)[np.newaxis,:],cmap='jet',aspect=20)
-		#ax[i].axes.get_xaxis().set_ticks([])
-		#ax[i].axes.get_yaxis().set_ticks([])
-		#ax[i].yaxis.set_label_coords(-0.05,0)
-		#ax[i].set_xlim([0,seqlenmax])
-		#ax[i].set_ylabel(name,rotation=0)
-	
-	#plt.show()
+		###plot
+		
+		ax[i].imshow(AA.stringToColorIndices(seq)[np.newaxis,:],cmap='jet',aspect=20)
+		ax[i].axes.get_xaxis().set_ticks([])
+		ax[i].axes.get_yaxis().set_ticks([])
+		ax[i].yaxis.set_label_coords(-0.05,0)
+		ax[i].set_xlim([0,seqlenmax])
+		ax[i].set_ylim([-0.7,0.7])
+		ax[i].set_ylabel(name,rotation=0)
+		
+		ax[i].spines['top'].set_visible(False)
+		ax[i].spines['right'].set_visible(False)
+		ax[i].spines['bottom'].set_visible(False)
+		ax[i].spines['left'].set_visible(False)
+
+		cmap = ListedColormap(['k','r'])
+		norm = BoundaryNorm([0,1],cmap.N)
+		
+		x = np.arange(len(aa))
+		
+		y = 0.65 * np.ones(len(aa))
+		points = np.array([x,y]).T.reshape(-1,1,2)
+		segments = np.concatenate([points[:-1],points[1:]],axis=1)
+		lc = LineCollection(segments,cmap=cmap,norm=norm)
+		lc.set_array(hmm1.mapPath)
+		lc.set_linewidth(6)
+		ax[i].add_collection(lc)
+		
+		y = -0.65 * np.ones(len(aa))
+		points = np.array([x,y]).T.reshape(-1,1,2)
+		segments = np.concatenate([points[:-1],points[1:]],axis=1)
+		lc = LineCollection(segments,cmap=cmap,norm=norm)
+		lc.set_array(hmm1.viterbiPath)
+		lc.set_linewidth(6)
+		ax[i].add_collection(lc)
+		
+		#print(hmm1.mapPath)
+		#print(hmm1.postProb)
+
+		###
+
+	plt.show()
 
 parser = argparse.ArgumentParser(description='plaac')
 parser.add_argument('-i','--inputFile')
@@ -257,27 +298,33 @@ parser.add_argument('-a','--alpha',type=float,default=1,
 	'  If alpha = 0, just the AA frequencies from the -B, -b, or -i are used, and if alpha = 1 just the\n  S. cerevisiae AA frequencies are used. Default is 1.0.'
 )
 parser.add_argument('-m','--hmmType',type=int)
-parser.add_argument('-p','--plotList',
-	help='-p print_list.txt, where print_list.txt has the name of one fasta on each line, and specifies'\
-	'\n  which fastas in input.fa will be plotted\n'\
-	'  The names must exactly match those in input.fa, but do need need the > symbol before the name.\n'\
-	'  If no print_list.txt is specified the output from the program will be a table of summaries for each protein (one per line) in input.fa;\n'\
-	'  If a print_list.txt is specified the output from the program will be a table (one line per residue) that is used\n'\
-	'  for making plots for each of the proteins listed in print_list.txt.\n'\
-	'  If the option is given as -p all, then plots will be made for all of the proteins in input.fa, \n  which is not advised if input.fa is an entire proteome.\n'\
-	'  To make the plots from output that has been redirected to output.txt, at the command-line type type\n  Rscript plaac_plot.r output.txt plotname.pdf.'\
-	'  This requires that the program R be installed (see http://www.r-project.org/)\n  and will create a file named plotname.pdf, with one plot per page.'\
-	'  Calling Rscript plaac_plot.r with no file specified will list other options for plotting.'
-)
+#parser.add_argument('-p','--plotList',
+#	help='-p print_list.txt, where print_list.txt has the name of one fasta on each line, and specifies'\
+#	'\n  which fastas in input.fa will be plotted\n'\
+#	'  The names must exactly match those in input.fa, but do need need the > symbol before the name.\n'\
+#	'  If no print_list.txt is specified the output from the program will be a table of summaries for each protein (one per line) in input.fa;\n'\
+#	'  If a print_list.txt is specified the output from the program will be a table (one line per residue) that is used\n'\
+#	'  for making plots for each of the proteins listed in print_list.txt.\n'\
+#	'  If the option is given as -p all, then plots will be made for all of the proteins in input.fa, \n  which is not advised if input.fa is an entire proteome.\n'\
+#	'  To make the plots from output that has been redirected to output.txt, at the command-line type type\n  Rscript plaac_plot.r output.txt plotname.pdf.'\
+#	'  This requires that the program R be installed (see http://www.r-project.org/)\n  and will create a file named plotname.pdf, with one plot per page.'\
+#	'  Calling Rscript plaac_plot.r with no file specified will list other options for plotting.'
+#)
+parser.add_argument('-p','--plotDir',help='-p plotDir')
 parser.add_argument('-H','--hmmDotFile',
 	help='-H hmm_filename.txt, writes parameters of HMM to hmm_filenmae.txt in dot format, which can be made into a figure with GraphViz.'
 )
 parser.add_argument('-d','--printHeaders',action='store_true',
 	help='-d, print documentation for headers. If flag is not set, headers will not be printed.'
 )
-parser.add_argument('-s','--printParameters',action='store_false',
-	help='-s, skip printing of run-time parameters at top of file. If flag is not set, run-time parameters will be printed.'
-)
+#parser.add_argument('-s','--printParameters',action='store_false',
+#	help='-s, skip printing of run-time parameters at top of file. If flag is not set, run-time parameters will be printed.'
+#)
+
+#parser.add_argument('-s','--printParameters',action='store_false',
+#	help='-s, skip printing of run-time parameters at top of file. If flag is not set, run-time parameters will be printed.'
+#)
+
 
 args = parser.parse_args()
 
@@ -331,5 +378,5 @@ hmm0 = HiddenMarkovModel.prionHMM0(bg)
 
 ww3 = 41
 
-if (args.inputFile is not None) and (args.plotList is None):
-	scoreAllFastas(args.inputFile,args.coreLength,args.ww1,args.ww2,ww3,fg,bg,llr,hmm1,hmm0)
+if (args.inputFile is not None):
+	scoreAllFastas(args.inputFile,args.coreLength,args.ww1,args.ww2,ww3,fg,bg,llr,hmm1,hmm0,args.plotDir)
