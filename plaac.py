@@ -24,6 +24,12 @@ def normalize(array):
 		sum = 1
 	return array/sum
 
+def normalize2(array):
+	max = array.max()
+	if max == 0:
+		max = 1
+	return array/max
+
 def readFasta(file):
 	with open(file,'r') as f:
 		slist = re.split(r'(>.*\n)',f.read())
@@ -76,6 +82,42 @@ def longestOnes(seq):
 
 #@profile
 
+def plotSeq(ax,name,seq,seqlenmax,mapPath,viterbiPath):
+	ax.imshow(AA.stringToColorIndices(seq)[np.newaxis,:],cmap='jet',aspect=20)
+	ax.axes.get_xaxis().set_ticks([])
+	ax.axes.get_yaxis().set_ticks([])
+	ax.yaxis.set_label_coords(-0.05,0)
+	ax.set_xlim([0,seqlenmax])
+	ax.set_ylim([-0.7,0.7])
+	ax.set_ylabel(name,rotation=0)
+	
+	ax.spines['top'].set_visible(False)
+	ax.spines['right'].set_visible(False)
+	ax.spines['bottom'].set_visible(False)
+	ax.spines['left'].set_visible(False)
+	ax.set_aspect('auto')
+
+	cmap = ListedColormap(['k','r'])
+	norm = BoundaryNorm([0,1],cmap.N)
+	
+	x = np.arange(len(seq))
+	
+	y = 0.65 * np.ones(len(seq))
+	points = np.array([x,y]).T.reshape(-1,1,2)
+	segments = np.concatenate([points[:-1],points[1:]],axis=1)
+	lc = LineCollection(segments,cmap=cmap,norm=norm)
+	lc.set_array(mapPath)
+	lc.set_linewidth(6)
+	ax.add_collection(lc)
+	
+	y = -0.65 * np.ones(len(seq))
+	points = np.array([x,y]).T.reshape(-1,1,2)
+	segments = np.concatenate([points[:-1],points[1:]],axis=1)
+	lc = LineCollection(segments,cmap=cmap,norm=norm)
+	lc.set_array(viterbiPath)
+	lc.set_linewidth(6)
+	ax.add_collection(lc)
+
 def scoreAllFastas(file,coreLength,ww1,ww2,ww3,fg,bg,llr,hmm1,hmm0,plotDir=None):
 	print(
 		"SEQid\tMW\tMWstart\tMWend\tMWlen\tLLR\tLLRstart\tLLRend\t"\
@@ -109,6 +151,11 @@ def scoreAllFastas(file,coreLength,ww1,ww2,ww3,fg,bg,llr,hmm1,hmm0,plotDir=None)
 		)
 	
 	cb.set_ticklabels(AA.ctable)
+
+	###
+	
+	if plotDir is not None:
+		os.makedirs(plotDir,exist_ok=True)
 
 	###
 	
@@ -223,41 +270,37 @@ def scoreAllFastas(file,coreLength,ww1,ww2,ww3,fg,bg,llr,hmm1,hmm0,plotDir=None)
 		print(str1+str2+str3)
 		
 		###plot
+				
+		plotSeq(ax[i],name,seq,seqlenmax,hmm1.mapPath,hmm1.viterbiPath)
 		
-		ax[i].imshow(AA.stringToColorIndices(seq)[np.newaxis,:],cmap='jet',aspect=20)
-		ax[i].axes.get_xaxis().set_ticks([])
-		ax[i].axes.get_yaxis().set_ticks([])
-		ax[i].yaxis.set_label_coords(-0.05,0)
-		ax[i].set_xlim([0,seqlenmax])
-		ax[i].set_ylim([-0.7,0.7])
-		ax[i].set_ylabel(name,rotation=0)
-		
-		ax[i].spines['top'].set_visible(False)
-		ax[i].spines['right'].set_visible(False)
-		ax[i].spines['bottom'].set_visible(False)
-		ax[i].spines['left'].set_visible(False)
-
-		cmap = ListedColormap(['k','r'])
-		norm = BoundaryNorm([0,1],cmap.N)
-		
-		x = np.arange(len(aa))
-		
-		y = 0.65 * np.ones(len(aa))
-		points = np.array([x,y]).T.reshape(-1,1,2)
-		segments = np.concatenate([points[:-1],points[1:]],axis=1)
-		lc = LineCollection(segments,cmap=cmap,norm=norm)
-		lc.set_array(hmm1.mapPath)
-		lc.set_linewidth(6)
-		ax[i].add_collection(lc)
-		
-		y = -0.65 * np.ones(len(aa))
-		points = np.array([x,y]).T.reshape(-1,1,2)
-		segments = np.concatenate([points[:-1],points[1:]],axis=1)
-		lc = LineCollection(segments,cmap=cmap,norm=norm)
-		lc.set_array(hmm1.viterbiPath)
-		lc.set_linewidth(6)
-		ax[i].add_collection(lc)
-		
+		if plotDir is not None:
+			figp,axp = plt.subplots(nrows=3,sharex=True,figsize=(12,6),gridspec_kw={'height_ratios': [1,0.2,1]})
+			#axp[0].set_ylim([0,0.01])
+			for i in range(hmm1.ns):
+				axp[0].plot(normalize2(hmm1.postProb[i]),label=hmm1.names[i])
+			
+			axp[0].set_xlim([0,len(seq)])
+			axp[0].set_ylim([-0.01,1.01])
+			axp[0].set_yticks([0,1])
+			axp[0].set_yticklabels(hmm1.states)
+			axp[0].legend(loc=(1.04,0.5))
+			
+			plotSeq(axp[1],name,seq,len(seq),hmm1.mapPath,hmm1.viterbiPath)
+			
+			axp[2].plot(dr.fi,label='FoldIndex')
+			axp[2].fill_between(np.arange(len(seq)),dr.fi)
+			axp[2].plot(-dr.plaacLLR,label='-PLAAC')
+			axp[2].plot(- 4 * dr.papa,label='-4*PAPA')
+			
+			axp[2].set_xlim([0,len(seq)])
+			axp[2].set_ylim([-1,1])
+			axp[2].legend(loc=(1.04,0.5))
+			
+			path = os.path.join(plotDir,name + '.png')
+			plt.subplots_adjust(right=0.85)
+			figp.savefig(path)
+			plt.close(figp)
+			
 		#print(hmm1.mapPath)
 		#print(hmm1.postProb)
 

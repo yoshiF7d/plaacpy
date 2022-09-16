@@ -62,10 +62,6 @@ class HiddenMarkovModel():
 		self.etst = 0.0
 		self.lpst = 0.0
 	
-	def setnames(self,names):
-		self.names = names
-		self.uNames = names
-
 	#SLOW 2
 	#@profile
 	def decodeAll(self,seq):
@@ -317,7 +313,7 @@ def prionHMM0(bgFreq):
 	hmm = HiddenMarkovModel(tmat,emat,imat)
 	hmm.subTrellis = np.array([1,0])
 	hmm.states = np.array(['-','+'])
-	hmm.setnames(['background','also.background'])
+	hmm.names = ['background','also.background']
 	return hmm
 	
 def prionHMM1(fgFreq,bgFreq):
@@ -330,7 +326,7 @@ def prionHMM1(fgFreq,bgFreq):
 	hmm = HiddenMarkovModel(tmat,emat,imat)
 	hmm.subTrellis = np.array([1,0])
 	hmm.states = np.array(['-','+'])
-	hmm.setnames(['background','PrD-like'])
+	hmm.names = ['background','PrD-like']
 	return hmm
 
 def logeapeb(a,b):
