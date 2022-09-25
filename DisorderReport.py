@@ -1,6 +1,8 @@
 import numpy as np
 np.seterr(divide = 'ignore')
 import AA
+import pyximport
+pyximport.install(setup_args={"include_dirs":np.get_include()})
 from HighestScoringSubsequence import highestScoringSubsequence
 from Colors import Colors
 

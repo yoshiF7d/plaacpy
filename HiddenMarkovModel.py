@@ -7,9 +7,10 @@ from Colors import Colors
 from functools import reduce
 np.seterr(divide = 'ignore') 
 
-#import pyximport
-#pyximport.install(setup_args={"include_dirs":np.get_include()})
-#from logProbTrellis import logProbTrellis
+import pyximport
+pyximport.install(setup_args={"include_dirs":np.get_include()})
+from logProbTrellis import logProbTrellis
+from Decode import decode
 
 class HiddenMarkovModel():
 	def	__init__(self,tprob,eprob,iprob):
@@ -65,8 +66,10 @@ class HiddenMarkovModel():
 	#SLOW 2
 	#@profile
 	def decodeAll(self,seq):
-		self.viterbiDecodeL(seq)
-		self.mapDecodeL(seq)
+		#self.viterbiDecodeL(seq)
+		#self.mapDecodeL(seq)
+		self.ltotProb,self.lviterbiProb,self.postProb,self.viterbiPath,self.mapPath = decode(seq,len(seq),self.ns,self.liprob,self.lfprob,self.ltprob,self.leprob)
+		self.lmarginalProb = self.ltotProb
 		#self.decode(seq)
 		self.margCollapse = np.zeros(len(seq))
 		self.etst = 0.0

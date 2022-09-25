@@ -7,6 +7,8 @@ np.seterr(divide = 'ignore')
 import re
 from tabulate import tabulate
 from DisorderReport import DisorderReport
+import pyximport
+pyximport.install(setup_args={"include_dirs":np.get_include()})
 from HighestScoringSubsequence import highestScoringSubsequence
 import time
 
@@ -81,8 +83,8 @@ class Sequence():
 			self.aaStop = -2
 			self.coreStart = -1
 			self.coreStop = -2
-			self.PRD = []
-			self.PRDScore = 0
+			self.indicesPRD = []
+			self.scorePRD = 0
 	
 	def print(self):
 		print(
@@ -112,7 +114,7 @@ class Sequence():
 					],
 					[
 						Colors.YELLOW + 'CORE' + Colors.RESET,
-						int(self.scoreCORE[2]),
+						self.scoreCORE[2],
 						self.coreStart+1,
 						self.coreStop+1,
 						self.coreStop - self.coreStart + 1
@@ -195,7 +197,7 @@ class Sequence():
 
 
 class Fasta():
-	def __init__(self,inputFile,coreLength,ww1,ww2,ww3,fg,bg):
+	def __init__(self,inputFile,coreLength,ww1,ww2,ww3,fg,bg,flim):
 		self.hmm = HiddenMarkovModel.prionHMM1(fg,bg)
 		self.hmmRef = HiddenMarkovModel.prionHMM0(bg)
 		self.llr = np.log(fg/bg)
@@ -205,6 +207,8 @@ class Fasta():
 		self.ww3 = ww3
 		
 		self.fasta = readFasta(inputFile)
+		if flim is not None:
+			self.fasta = self.fasta[flim[0]:flim[1]]
 		self.fastaLen = len(self.fasta)
 		self.seqLenMax = np.max([len(fs[1]) for fs in self.fasta])
 		
@@ -321,6 +325,13 @@ def longestOnes(seq):
 			i += 1
 	return maxl
 
+def parselim(limstr):
+	l0,l1 = limstr.split(",")
+	l0 = l0.lstrip('([').lstrip()
+	l1 = l1.rstrip(')]').rstrip()
+	return [int(l0),int(l1)]
+
+
 parser = argparse.ArgumentParser(description='plaac')
 parser.add_argument('-i','--inputFile')
 parser.add_argument('-b','--bgFile',
@@ -373,6 +384,8 @@ parser.add_argument('-H','--hmmDotFile',
 parser.add_argument('-d','--printHeaders',action='store_true',
 	help='-d, print documentation for headers. If flag is not set, headers will not be printed.'
 )
+
+parser.add_argument('-f','--flim',help='-f [fmin,fmax]')
 #parser.add_argument('-s','--printParameters',action='store_false',
 #	help='-s, skip printing of run-time parameters at top of file. If flag is not set, run-time parameters will be printed.'
 #)
@@ -384,6 +397,8 @@ parser.add_argument('-d','--printHeaders',action='store_true',
 
 args = parser.parse_args()
 
+if args.flim is not None:
+	args.flim = parselim(args.flim)
 #readFasta(args.inputFile)
 #test(args.inputFile)
 #print(readAAParams(args.inputFile))
@@ -436,5 +451,5 @@ ww3 = 41
 
 if (args.inputFile is not None):
 	#scoreAllFastas(args.inputFile,args.coreLength,args.ww1,args.ww2,ww3,fg,bg,llr,hmm1,hmm0,args.plotDir)
-	fasta = Fasta(args.inputFile,args.coreLength,args.ww1,args.ww2,ww3,fg,bg)
+	fasta = Fasta(args.inputFile,args.coreLength,args.ww1,args.ww2,ww3,fg,bg,args.flim)
 	fasta.print(args.plotDir)
