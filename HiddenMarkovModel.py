@@ -64,7 +64,7 @@ class HiddenMarkovModel():
 		self.lpst = 0.0
 	
 	#SLOW 2
-	#@profile
+	@profile
 	def decodeAll(self,seq):
 		#self.viterbiDecodeL(seq)
 		#self.mapDecodeL(seq)
@@ -81,8 +81,8 @@ class HiddenMarkovModel():
 			self.margCollapse = self.postProb[0]
 			self.etst = np.sum(self.postProb[0])
 		
-		self.lpst = self.logProbSubTrellis(seq)
-		#self.lpst = self.logProbSubTrellisFast(seq)
+		#self.lpst = self.logProbSubTrellis(seq)
+		self.lpst = self.logProbSubTrellisFast(seq)
 	
 	# vitabiDecodeL and mapDecodeL are combined in one and it becomes slow why
 	#@profile

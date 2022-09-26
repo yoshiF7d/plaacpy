@@ -1,3 +1,7 @@
+# distutils: extra_compile_args = ["-O3"]
+# cython: language_level=3, boundscheck=False, wraparound=False
+# cython: cdivision=True
+
 import numpy as np
 cimport numpy as np
 
@@ -39,19 +43,19 @@ cpdef decode(
 	for i in range(ns):
 		a[i,0] = s[i,0] = liprob[i] + leprob[i,seq[0]]
 	
-	for t in range(n):
+	for t in range(1,n):
 		for i in range(ns):
 			for j in range(ns):
 				temp[j] = ltprob[j,i] + s[j,t-1]
 			tb[i,t] = bestIndex = argmax(temp,ns)
 			bestScore = ltprob[bestIndex,i] + s[bestIndex,t-1]
-			s[i,t] = bestScore + leprob[i,seq[i]]
+			s[i,t] = bestScore + leprob[i,seq[t]]
 			for j in range(ns):
 				temp[j] = ltprob[j,i] + a[j,t-1]
 			a[i,t] = reduce(temp,ns) + leprob[i,seq[t]]
 
 	for j in range(ns):
-		temp[j] = lfprob[j] + a[j,t-1]
+		temp[j] = lfprob[j] + a[j,n-1]
 	ltotProb = reduce(temp,ns)
 	
 	for j in range(ns):
@@ -61,7 +65,7 @@ cpdef decode(
 	bestIndex = argmax(temp,ns)
 	bestScore = s[bestIndex,n-1] + lfprob[bestIndex]
 	vit[n-1] = bestIndex
-	
+		
 	for t in reversed(range(n-1)):
 		vit[t] = tb[vit[t+1],t+1]
 		for i in range(ns):
@@ -104,19 +108,16 @@ cdef double reduce(
 	np.ndarray[DOUBLE,ndim=1] arr,
 	int n
 ):
-	cdef double tot = 0
+	cdef double tot = - np.inf
 	cdef int i
 	
 	for i in range(n):
-		if tot == 0:
-			tot = arr[i]
+		if tot > arr[i]:
+			tot += log(1+exp(arr[i]-tot))
+		elif tot < arr[i]:
+			tot = arr[i] + log(1+exp(tot-arr[i]))
 		else:
-			if tot > arr[i]:
-				tot += log(1+exp(arr[i]-tot))
-			elif tot < arr[i]:
-				tot = arr[i] + log(1+exp(tot-arr[i]))
-			else:
-				tot += log(2)
+			tot += log(2)
 				
 	#print(tot)
 	return tot

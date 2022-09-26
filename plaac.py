@@ -42,7 +42,7 @@ class Sequence():
 			self.sizeMW = len(self.indicesMW)
 		self.scoreMW = highestScoringSubsequence(self.indicesMW,self.sizeMW,self.sizeMW)
 		
-		self.indicesLLR = llr[self.indices]
+		self.indicesLLR = fasta.llr[self.indices]
 		self.sizeLLR = fasta.coreLength
 		self.scoreLLR = highestScoringSubsequence(self.indicesLLR,self.sizeLLR,self.sizeLLR)
 		
@@ -60,8 +60,10 @@ class Sequence():
 		bigNeg = -1e+6
 		self.indicesCORE[self.viterbiPath==0] = bigNeg
 		
-		self.scoreCORE = highestScoringSubsequence(self.indicesCORE,fasta.coreLength,fasta.coreLength)
+		#print(self.viterbiPath)
 		
+		self.scoreCORE = highestScoringSubsequence(self.indicesCORE,fasta.coreLength,fasta.coreLength)
+				
 		self.coreStart = self.scoreCORE[0]
 		self.coreStop = self.scoreCORE[1]
 		
@@ -76,7 +78,7 @@ class Sequence():
 				self.aaStop += 1
 			self.aaStop -= 1
 			self.indicesPRD = self.indices[self.aaStart:self.aaStop]
-			self.scorePRD = np.sum(llr[self.indicesPRD])
+			self.scorePRD = np.sum(fasta.llr[self.indicesPRD])
 		else:
 			self.scoreCORE[2] = np.nan
 			self.aaStart = -1
@@ -195,8 +197,28 @@ class Sequence():
 		lc.set_linewidth(6)
 		ax.add_collection(lc)
 
+	def printSequence(self):
+		ist = 0
+		flag = False
+		slist = []
+		for i in range(self.length):
+			if self.hmm.mapPath[i] > 0 :
+				if not flag:
+					flag = True
+					slist.append(self.seq[ist:i] + Colors.RED)
+					ist = i
+			elif flag:
+				flag = False
+				slist.append(self.seq[ist:i] + Colors.RESET)
+				ist = i
+				
+		slist.append(self.seq[ist:])
+		
+		print(''.join(slist))
+		print(Colors.RESET)
 
 class Fasta():
+	@profile
 	def __init__(self,inputFile,coreLength,ww1,ww2,ww3,fg,bg,flim):
 		self.hmm = HiddenMarkovModel.prionHMM1(fg,bg)
 		self.hmmRef = HiddenMarkovModel.prionHMM0(bg)
@@ -225,7 +247,8 @@ class Fasta():
 			orientation='horizontal'
 		)
 		self.colorBar.set_ticklabels(AA.ctable)
-		
+	
+	@profile
 	def print(self,plotDir):
 		if plotDir is not None:
 			os.makedirs(plotDir,exist_ok=True)
@@ -233,6 +256,8 @@ class Fasta():
 		for i,fs in enumerate(self.fasta):
 			seq = Sequence(*fs,self)
 			seq.print()
+			seq.printSequence()
+			
 			seq.plot(self.ax[i],self.seqLenMax)
 			if plotDir is not None:
 				figp,axp = plt.subplots(nrows=3,sharex=True,figsize=(12,6),gridspec_kw={'height_ratios': [1,0.2,1]})
@@ -261,7 +286,7 @@ class Fasta():
 				plt.subplots_adjust(right=0.85)
 				figp.savefig(path)
 				plt.close(figp)
-		plt.show()
+		#plt.show()
 	
 def normalize(array):
 	sum = array.sum()
@@ -325,11 +350,14 @@ def longestOnes(seq):
 			i += 1
 	return maxl
 
+
 def parselim(limstr):
 	l0,l1 = limstr.split(",")
 	l0 = l0.lstrip('([').lstrip()
 	l1 = l1.rstrip(')]').rstrip()
 	return [int(l0),int(l1)]
+
+
 
 
 parser = argparse.ArgumentParser(description='plaac')
@@ -438,7 +466,6 @@ bgCombo[21] = epsx
 
 fg = normalize(fgFreq)
 bg = normalize(bgCombo)
-llr = np.log(fg/bg)
 
 #print(Colors.YELLOW + str(fg) + Colors.RESET)
 #print(Colors.CYAN + str(bg) + Colors.RESET)
