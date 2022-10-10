@@ -12,31 +12,39 @@ from tabulate import tabulate
 
 driverPath = '/Users/star-yoshi/plaac/chromedriver'
 chromiumPath = '/Users/star-yoshi/plaac/chromedriver'
+urlSYGDS288c = 'https://nribf1.nrib.go.jp/SYGD/search.cgi?prj=01303&sgnm=1&sobj=gen'
 urlSYGDK7 = 'https://nribf1.nrib.go.jp/SYGD/search.cgi?prj=01303&sgnm=2&sobj=gen'
 
+
 def getAA(driver,geneName):
-    driver.get(urlSYGDK7 + '&sgen_freetxt=' + geneName)
+    driver.get(urlSYGDS288c + '&sgen_freetxt=' + geneName)
     res = driver.find_elements(By.XPATH,"//div[@id='tab1']/div/table[@class='listing']/tbody/tr[@class]")
     #strlist = [Colors.CYAN + geneName + Colors.RESET]
     #ratlist = [None]
-    ratmax = 0
-    for r in res:
-        hit = r.find_element(By.XPATH,"./td[position()=3]")
-        rat = Levenshtein.ratio(geneName,hit.text)
-        if rat > ratmax:
-            ratmax = rat
-            hitres = hit
-    
-    hitname = hitres.text
-    #print(len(res))
     
     if res:
+        hitres = res[0].find_element(By.XPATH,"./td[position()=3]")
+        ratmax = Levenshtein.ratio(geneName,hitres.text)
+    
+        for r in res[1:]:
+            hit = r.find_element(By.XPATH,"./td[position()=3]")
+            rat = Levenshtein.ratio(geneName,hit.text)
+            if rat > ratmax:
+                ratmax = rat
+                hitres = hit
+        
+        hitname = hitres.text
         link=hitres.find_element(By.XPATH,"./preceding-sibling::td/a").get_attribute('href')
         driver.get(link)
         tabs=driver.find_element(By.XPATH,"//div[@class='ui-tabs ui-corner-all ui-widget ui-widget-content']")
         tab3=tabs.find_element(By.XPATH,"./ul[@role='tablist']/li[position()=3]")
         tab3.click()
-        aa = tabs.find_element(By.XPATH,"./div[position()=3]/div/dt/textarea").text
+        aa = tabs.find_elements(By.XPATH,"./div[position()=3]/div/dt/textarea")
+        if  len(aa) > 0:
+            aa = aa[0].text
+        else:
+            print(Colors.CYAN + geneName + Colors.RESET)
+            return None
         
         print(
             Colors.CYAN + geneName + Colors.RESET + ' : ' + 
@@ -46,6 +54,7 @@ def getAA(driver,geneName):
         print(aa)
         return aa[0] + hitname + '|' + aa[1:]
     else:
+        print(Colors.CYAN + geneName + Colors.RESET)
         return None
 
 parser = argparse.ArgumentParser()

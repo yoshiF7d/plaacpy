@@ -81,8 +81,8 @@ class Sequence():
 			self.aaStop = -2
 			self.coreStart = -1
 			self.coreStop = -2
-			self.PRD = []
-			self.PRDScore = 0
+			self.indicesPRD = []
+			self.scorePRD = 0
 	
 	def print(self):
 		print(
@@ -98,21 +98,21 @@ class Sequence():
 					],
 					[
 						Colors.YELLOW + 'MW' + Colors.RESET,
-						int(self.scoreMW[2]),
+						toInt(self.scoreMW[2]),
 						self.scoreMW[0]+1,
 						self.scoreMW[1]+1,
 						self.scoreMW[1]-self.scoreMW[0]+1
 					],
 					[
 						Colors.YELLOW + 'LLR' + Colors.RESET,
-						int(self.scoreLLR[2]),
+						toInt(self.scoreLLR[2]),
 						self.scoreLLR[0]+1,
 						self.scoreLLR[1]+1,
 						self.scoreLLR[1]-self.scoreLLR[0]+1
 					],
 					[
 						Colors.YELLOW + 'CORE' + Colors.RESET,
-						int(self.scoreCORE[2]),
+						toInt(self.scoreCORE[2]),
 						self.coreStart+1,
 						self.coreStop+1,
 						self.coreStop - self.coreStart + 1
@@ -120,7 +120,7 @@ class Sequence():
 					],
 					[
 						Colors.YELLOW + 'PRD' + Colors.RESET,
-						int(self.scorePRD),
+						toInt(self.scorePRD),
 						self.aaStart+1,
 						self.aaStop+1,
 						self.aaStop - self.aaStart + 1
@@ -205,31 +205,37 @@ class Fasta():
 		self.ww3 = ww3
 		
 		self.fasta = readFasta(inputFile)
+		if flim is not None:
+			self.fasta = self.fasta[flim[0]:flim[1]]
+			
 		self.fastaLen = len(self.fasta)
 		self.seqLenMax = np.max([len(fs[1]) for fs in self.fasta])
 		
-		self.fig, self.ax = plt.subplots(nrows=self.fastaLen,sharex=True,figsize=(12,3))
-		self.scalarMap = plt.cm.ScalarMappable(
-			cmap = plt.get_cmap('jet',len(AA.ctable)),
-			norm = matplotlib.colors.BoundaryNorm(np.arange(len(AA.ctable)+1)-0.5,len(AA.ctable))
-		)
-		self.scalarMap.set_array([])
-		self.colorBar = self.fig.colorbar(self.scalarMap,ax=self.ax,
-			ticks=np.arange(len(AA.ctable)),
-			location='top',
-			shrink=0.8,
-			orientation='horizontal'
-		)
-		self.colorBar.set_ticklabels(AA.ctable)
+		if summary is not None:
+			self.fig, self.ax = plt.subplots(nrows=self.fastaLen,sharex=True,figsize=(12,3))
+			self.scalarMap = plt.cm.ScalarMappable(
+				cmap = plt.get_cmap('jet',len(AA.ctable)),
+				norm = matplotlib.colors.BoundaryNorm(np.arange(len(AA.ctable)+1)-0.5,len(AA.ctable))
+			)
+			self.scalarMap.set_array([])
+			self.colorBar = self.fig.colorbar(self.scalarMap,ax=self.ax,
+				ticks=np.arange(len(AA.ctable)),
+				location='top',
+				shrink=0.8,
+				orientation='horizontal'
+			)
+			self.colorBar.set_ticklabels(AA.ctable)
 		
-	def print(self,plotDir):
+	def print(self,plotDir,summary):
 		if plotDir is not None:
 			os.makedirs(plotDir,exist_ok=True)
 		
 		for i,fs in enumerate(self.fasta):
 			seq = Sequence(*fs,self)
 			seq.print()
-			seq.plot(self.ax[i],self.seqLenMax)
+			if summary is not None:
+				seq.plot(self.ax[i],self.seqLenMax)
+			
 			if plotDir is not None:
 				figp,axp = plt.subplots(nrows=3,sharex=True,figsize=(12,6),gridspec_kw={'height_ratios': [1,0.2,1]})
 				#axp[0].set_ylim([0,0.01])
@@ -257,7 +263,8 @@ class Fasta():
 				plt.subplots_adjust(right=0.85)
 				figp.savefig(path)
 				plt.close(figp)
-		plt.show()
+		if summary is not None:
+			plt.show()
 	
 def normalize(array):
 	sum = array.sum()
@@ -279,7 +286,7 @@ def readFasta(file):
 	slist = [slist[i:i+2] for i in range(0,len(slist),2)]
 	
 	for i in range(len(slist)):
-		slist[i][0] = slist[i][0][1:].strip()
+		slist[i][0] = slist[i][0][1:].strip().split('|')[0]
 		slist[i][1] = re.sub('\n','',slist[i][1])
 	
 	return slist
@@ -320,7 +327,19 @@ def longestOnes(seq):
 		else:
 			i += 1
 	return maxl
+	
+def toInt(val):
+	if np.isnan(val):
+		return val
+	else:
+		return int(val)
 
+def parselim(limstr):
+	l0,l1 = limstr.split(",")
+	l0 = l0.lstrip('([').lstrip()
+	l1 = l1.rstrip(')]').rstrip()
+	return [int(l0),int(l1)]
+	
 parser = argparse.ArgumentParser(description='plaac')
 parser.add_argument('-i','--inputFile')
 parser.add_argument('-b','--bgFile',
@@ -367,6 +386,10 @@ parser.add_argument('-m','--hmmType',type=int)
 #	'  Calling Rscript plaac_plot.r with no file specified will list other options for plotting.'
 #)
 parser.add_argument('-p','--plotDir',help='-p plotDir')
+parser.add_argument('-s','--summary',action='store_true',help='summary plot')
+parser.add_argument('--oneLine',action='store_true',help='print only core score')
+parser.add_argument('-f','--flim',help='-f [fmin,fmax]')
+
 parser.add_argument('-H','--hmmDotFile',
 	help='-H hmm_filename.txt, writes parameters of HMM to hmm_filenmae.txt in dot format, which can be made into a figure with GraphViz.'
 )
@@ -384,6 +407,8 @@ parser.add_argument('-d','--printHeaders',action='store_true',
 
 args = parser.parse_args()
 
+if args.flim is not None:
+	args.flim = parselim(args.flim)
 #readFasta(args.inputFile)
 #test(args.inputFile)
 #print(readAAParams(args.inputFile))
@@ -436,5 +461,5 @@ ww3 = 41
 
 if (args.inputFile is not None):
 	#scoreAllFastas(args.inputFile,args.coreLength,args.ww1,args.ww2,ww3,fg,bg,llr,hmm1,hmm0,args.plotDir)
-	fasta = Fasta(args.inputFile,args.coreLength,args.ww1,args.ww2,ww3,fg,bg)
+	fasta = Fasta(args.inputFile,args.coreLength,args.ww1,args.ww2,ww3,fg,bg,flim,args.summary)
 	fasta.print(args.plotDir)
