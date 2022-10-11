@@ -19,7 +19,7 @@ import os
 os.system('')
 
 class Sequence():
-	def __init__(self,name,seq,fasta):
+	def __init__(self,name,seq,fasta,oneLine=False):
 		self.name = name
 		self.seq = seq
 		if self.seq[-1] == '*':
@@ -33,27 +33,31 @@ class Sequence():
 		
 		self.hmm = fasta.hmm
 		self.hmmRef = fasta.hmmRef
-		
-		self.indicesMW = AA.table['mask'][self.indices]
-		self.sizeMW = 80
-		if len(self.indicesMW) < 80:
-			self.sizeMW = len(self.indicesMW)
-		self.scoreMW = highestScoringSubsequence(self.indicesMW,self.sizeMW,self.sizeMW)
-		
-		self.indicesLLR = llr[self.indices]
-		self.sizeLLR = fasta.coreLength
-		self.scoreLLR = highestScoringSubsequence(self.indicesLLR,self.sizeLLR,self.sizeLLR)
-		
+				
 		self.hmm.decodeAll(self.indices)
-		self.hmmRef.decodeAll(self.indices)
-		
-		self.hmmScore = self.hmm.lmarginalProb - self.hmmRef.lmarginalProb
-		self.hmmScoreV = self.hmm.lviterbiProb - self.hmmRef.lviterbiProb
-		
-		self.disorderReport = DisorderReport(self.indices,fasta.ww1,fasta.ww2,fasta.ww3,np.array([2.785,-1,-1.151]),fasta.llr,AA.table['lodpapa1'])
 		self.viterbiPath = self.hmm.viterbiPath
-		self.longestPrd = longestOnes(self.viterbiPath)
 		
+		if not oneLine:
+			self.hmmRef.decodeAll(self.indices)
+			self.hmmScore = self.hmm.lmarginalProb - self.hmmRef.lmarginalProb
+			self.hmmScoreV = self.hmm.lviterbiProb - self.hmmRef.lviterbiProb
+		
+			#MW#
+			self.indicesMW = AA.table['mask'][self.indices]
+			self.sizeMW = 80
+			if len(self.indicesMW) < 80:
+				self.sizeMW = len(self.indicesMW)
+			self.scoreMW = highestScoringSubsequence(self.indicesMW,self.sizeMW,self.sizeMW)
+			##
+
+			#LLR#
+			self.indicesLLR = llr[self.indices]
+			self.sizeLLR = fasta.coreLength
+			self.scoreLLR = highestScoringSubsequence(self.indicesLLR,self.sizeLLR,self.sizeLLR)
+			##
+			self.disorderReport = DisorderReport(self.indices,fasta.ww1,fasta.ww2,fasta.ww3,np.array([2.785,-1,-1.151]),fasta.llr,AA.table['lodpapa1'])
+			self.longestPrd = longestOnes(self.viterbiPath)
+
 		self.indicesCORE = fasta.llr[self.indices]
 		bigNeg = -1e+6
 		self.indicesCORE[self.viterbiPath==0] = bigNeg
@@ -81,8 +85,8 @@ class Sequence():
 			self.aaStop = -2
 			self.coreStart = -1
 			self.coreStop = -2
-			self.indicesPRD = []
-			self.scorePRD = 0
+			self.PRD = []
+			self.PRDScore = 0
 	
 	def print(self):
 		print(
@@ -98,36 +102,36 @@ class Sequence():
 					],
 					[
 						Colors.YELLOW + 'MW' + Colors.RESET,
-						toInt(self.scoreMW[2]),
-						self.scoreMW[0]+1,
-						self.scoreMW[1]+1,
-						self.scoreMW[1]-self.scoreMW[0]+1
+						int(self.scoreMW[2]),
+						int(self.scoreMW[0]+1),
+						int(self.scoreMW[1]+1),
+						int(self.scoreMW[1]-self.scoreMW[0]+1)
 					],
 					[
 						Colors.YELLOW + 'LLR' + Colors.RESET,
-						toInt(self.scoreLLR[2]),
-						self.scoreLLR[0]+1,
-						self.scoreLLR[1]+1,
-						self.scoreLLR[1]-self.scoreLLR[0]+1
+						self.scoreLLR[2],
+						int(self.scoreLLR[0]+1),
+						int(self.scoreLLR[1]+1),
+						int(self.scoreLLR[1]-self.scoreLLR[0]+1)
 					],
 					[
 						Colors.YELLOW + 'CORE' + Colors.RESET,
-						toInt(self.scoreCORE[2]),
-						self.coreStart+1,
-						self.coreStop+1,
-						self.coreStop - self.coreStart + 1
+						self.scoreCORE[2],
+						int(self.coreStart+1),
+						int(self.coreStop+1),
+						int(self.coreStop - self.coreStart + 1)
 					
 					],
 					[
 						Colors.YELLOW + 'PRD' + Colors.RESET,
-						toInt(self.scorePRD),
-						self.aaStart+1,
-						self.aaStop+1,
-						self.aaStop - self.aaStart + 1
+						self.scorePRD,
+						int(self.aaStart+1),
+						int(self.aaStop+1),
+						int(self.aaStop - self.aaStart + 1)
 					]
 				],
 				headers="firstrow",
-				floatfmt=".2f"
+				floatfmt=".3f"
 			)
 		)
 		print()
@@ -155,7 +159,30 @@ class Sequence():
 			)
 		)
 		print()
-		
+
+	def printSequence(self):
+			ist = 0
+			flag = False
+			slist = []
+			for i in range(self.length):
+				if self.hmm.mapPath[i] > 0 :
+					if not flag:
+						flag = True
+						slist.append(self.seq[ist:i] + Colors.RED)
+						ist = i
+				elif flag:
+					flag = False
+					slist.append(self.seq[ist:i] + Colors.RESET)
+					ist = i
+					
+			slist.append(self.seq[ist:])
+			
+			print(''.join(slist))
+			print(Colors.RESET)
+
+	def printScoreCore(self):
+		print(self.name + '\t' + f'{self.scoreCORE[2]:.3f}')
+
 	def plot(self,ax,length):
 		ax.imshow(AA.stringToColorIndices(self.seq)[np.newaxis,:],cmap='jet',aspect=20)
 		ax.axes.get_xaxis().set_ticks([])
@@ -195,7 +222,7 @@ class Sequence():
 
 
 class Fasta():
-	def __init__(self,inputFile,coreLength,ww1,ww2,ww3,fg,bg):
+	def __init__(self,inputFile,coreLength,ww1,ww2,ww3,fg,bg,flim,visualize):
 		self.hmm = HiddenMarkovModel.prionHMM1(fg,bg)
 		self.hmmRef = HiddenMarkovModel.prionHMM0(bg)
 		self.llr = np.log(fg/bg)
@@ -203,16 +230,19 @@ class Fasta():
 		self.ww1 = ww1
 		self.ww2 = ww2
 		self.ww3 = ww3
-		
+
 		self.fasta = readFasta(inputFile)
+
 		if flim is not None:
 			self.fasta = self.fasta[flim[0]:flim[1]]
-			
-		self.fastaLen = len(self.fasta)
-		self.seqLenMax = np.max([len(fs[1]) for fs in self.fasta])
-		
-		if summary is not None:
+
+		if visualize:
+			self.fastaLen = len(self.fasta)		
+			self.seqLenMax = np.max([len(fs[1]) for fs in self.fasta])
+
 			self.fig, self.ax = plt.subplots(nrows=self.fastaLen,sharex=True,figsize=(12,3))
+			if len(self.fasta) == 1:
+				self.ax = [self.ax]
 			self.scalarMap = plt.cm.ScalarMappable(
 				cmap = plt.get_cmap('jet',len(AA.ctable)),
 				norm = matplotlib.colors.BoundaryNorm(np.arange(len(AA.ctable)+1)-0.5,len(AA.ctable))
@@ -226,16 +256,19 @@ class Fasta():
 			)
 			self.colorBar.set_ticklabels(AA.ctable)
 		
-	def print(self,plotDir,summary):
+	def print(self,plotDir,visualize,oneLine):
 		if plotDir is not None:
 			os.makedirs(plotDir,exist_ok=True)
 		
 		for i,fs in enumerate(self.fasta):
-			seq = Sequence(*fs,self)
-			seq.print()
-			if summary is not None:
+			seq = Sequence(*fs,self,oneLine)
+			if oneLine:
+				seq.printScoreCore()
+			else:
+				seq.print()
+				seq.printSequence()
+			if visualize:
 				seq.plot(self.ax[i],self.seqLenMax)
-			
 			if plotDir is not None:
 				figp,axp = plt.subplots(nrows=3,sharex=True,figsize=(12,6),gridspec_kw={'height_ratios': [1,0.2,1]})
 				#axp[0].set_ylim([0,0.01])
@@ -263,7 +296,7 @@ class Fasta():
 				plt.subplots_adjust(right=0.85)
 				figp.savefig(path)
 				plt.close(figp)
-		if summary is not None:
+		if visualize:
 			plt.show()
 	
 def normalize(array):
@@ -286,7 +319,7 @@ def readFasta(file):
 	slist = [slist[i:i+2] for i in range(0,len(slist),2)]
 	
 	for i in range(len(slist)):
-		slist[i][0] = slist[i][0][1:].strip().split('|')[0]
+		slist[i][0] = slist[i][0][1:].split()[0]
 		slist[i][1] = re.sub('\n','',slist[i][1])
 	
 	return slist
@@ -327,19 +360,13 @@ def longestOnes(seq):
 		else:
 			i += 1
 	return maxl
-	
-def toInt(val):
-	if np.isnan(val):
-		return val
-	else:
-		return int(val)
 
 def parselim(limstr):
 	l0,l1 = limstr.split(",")
 	l0 = l0.lstrip('([').lstrip()
 	l1 = l1.rstrip(')]').rstrip()
 	return [int(l0),int(l1)]
-	
+
 parser = argparse.ArgumentParser(description='plaac')
 parser.add_argument('-i','--inputFile')
 parser.add_argument('-b','--bgFile',
@@ -386,29 +413,27 @@ parser.add_argument('-m','--hmmType',type=int)
 #	'  Calling Rscript plaac_plot.r with no file specified will list other options for plotting.'
 #)
 parser.add_argument('-p','--plotDir',help='-p plotDir')
-parser.add_argument('-s','--summary',action='store_true',help='summary plot')
-parser.add_argument('--oneLine',action='store_true',help='print only core score')
-parser.add_argument('-f','--flim',help='-f [fmin,fmax]')
-
 parser.add_argument('-H','--hmmDotFile',
 	help='-H hmm_filename.txt, writes parameters of HMM to hmm_filenmae.txt in dot format, which can be made into a figure with GraphViz.'
 )
 parser.add_argument('-d','--printHeaders',action='store_true',
 	help='-d, print documentation for headers. If flag is not set, headers will not be printed.'
 )
-#parser.add_argument('-s','--printParameters',action='store_false',
-#	help='-s, skip printing of run-time parameters at top of file. If flag is not set, run-time parameters will be printed.'
-#)
+
+parser.add_argument('-v','--visualize',action='store_true',help='visualization on')
+parser.add_argument('-o','--oneLine',action='store_true',help='print coreScore only')
+parser.add_argument('-f','--flim',help='-f [fmin,fmax] specifies the range of fastas to be read')
 
 #parser.add_argument('-s','--printParameters',action='store_false',
 #	help='-s, skip printing of run-time parameters at top of file. If flag is not set, run-time parameters will be printed.'
 #)
 
+#parser.add_argument('-s','--printParameters',action='store_false',
+#	help='-s, skip printing of run-time parameters at top of file. If flag is not set, run-time parameters will be printed.'
+#)
 
 args = parser.parse_args()
 
-if args.flim is not None:
-	args.flim = parselim(args.flim)
 #readFasta(args.inputFile)
 #test(args.inputFile)
 #print(readAAParams(args.inputFile))
@@ -426,6 +451,12 @@ elif args.inputFile is not None:
 
 if args.fgFreqFile is not None:
 	fgFreq = readAAParams(args.fgFreqFile)
+
+if args.flim is not None:
+	args.flim = parselim(args.f)
+
+if args.oneLine:
+	args.visualize = False
 
 fgFreq = AA.table['prdFreqScer28']
 bgScer = normalize(AA.table['bgFreqScer'])
@@ -461,5 +492,5 @@ ww3 = 41
 
 if (args.inputFile is not None):
 	#scoreAllFastas(args.inputFile,args.coreLength,args.ww1,args.ww2,ww3,fg,bg,llr,hmm1,hmm0,args.plotDir)
-	fasta = Fasta(args.inputFile,args.coreLength,args.ww1,args.ww2,ww3,fg,bg,flim,args.summary)
-	fasta.print(args.plotDir)
+	fasta = Fasta(args.inputFile,args.coreLength,args.ww1,args.ww2,ww3,fg,bg,args.flim,args.visualize)
+	fasta.print(args.plotDir,args.visualize,args.oneLine)
