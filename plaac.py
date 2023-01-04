@@ -85,8 +85,8 @@ class Sequence():
 			self.aaStop = -2
 			self.coreStart = -1
 			self.coreStop = -2
-			self.PRD = []
-			self.PRDScore = 0
+			self.indicesPRD = []
+			self.scorePRD = 0
 	
 	def print(self):
 		print(
@@ -319,7 +319,7 @@ def readFasta(file):
 	slist = [slist[i:i+2] for i in range(0,len(slist),2)]
 	
 	for i in range(len(slist)):
-		slist[i][0] = slist[i][0][1:].split()[0]
+		slist[i][0] = slist[i][0][1:].split('|')[0]
 		slist[i][1] = re.sub('\n','',slist[i][1])
 	
 	return slist
